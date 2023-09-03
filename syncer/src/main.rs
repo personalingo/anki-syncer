@@ -3,8 +3,11 @@ async fn main() {
     anki::log::set_global_logger(None).unwrap();
 
     let coll_path = std::env::var("COLLECTION_PATH").expect("COLLECTION_PATH not set");
+    let host = std::env::var("ANKI_HOST").expect("ANKI_HOST not set");
     let username = std::env::var("ANKI_USERNAME").expect("ANKI_USERNAME not set");
     let password = std::env::var("ANKI_PASSWORD").expect("ANKI_PASSWORD not set");
+
+    std::env::set_var("SYNC_ENDPOINT", host);
 
     let mut collection = anki::collection::CollectionBuilder::new(coll_path)
         .build()
