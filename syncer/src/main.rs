@@ -9,7 +9,7 @@ async fn main() {
 
     std::env::set_var("SYNC_ENDPOINT", host);
 
-    let mut collection = anki::collection::CollectionBuilder::new(coll_path)
+    let mut collection = anki::collection::CollectionBuilder::new(coll_path.clone())
         .build()
         .expect("failed to build collection");
 
@@ -29,5 +29,12 @@ async fn main() {
             .full_download(sync_auth, Box::new(|_, _| {}))
             .await
             .expect("full download failed");
+    } else {
+        drop(collection);
     }
+
+    // Open the collection again to upgrade schema.
+    anki::collection::CollectionBuilder::new(coll_path)
+        .build()
+        .expect("failed to re-build collection");
 }

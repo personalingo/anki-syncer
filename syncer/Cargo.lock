@@ -158,6 +158,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "anki-syncer"
+version = "0.1.0"
+dependencies = [
+ "anki",
+ "reqwest",
+ "tokio",
+]
+
+[[package]]
 name = "anki_i18n"
 version = "0.0.0"
 dependencies = [
@@ -1490,15 +1499,6 @@ name = "percent-encoding"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b2a4787296e9989611394c33f193f676704af1686e70b8f8033ab5ba9a35a94"
-
-[[package]]
-name = "personalingo-syncer"
-version = "0.1.0"
-dependencies = [
- "anki",
- "reqwest",
- "tokio",
-]
 
 [[package]]
 name = "petgraph"
