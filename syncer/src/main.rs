@@ -7,7 +7,16 @@ async fn main() {
     let username = std::env::var("ANKI_USERNAME").expect("ANKI_USERNAME not set");
     let password = std::env::var("ANKI_PASSWORD").expect("ANKI_PASSWORD not set");
 
-    std::env::set_var("SYNC_ENDPOINT", host);
+    std::env::set_var(
+        "SYNC_ENDPOINT",
+        if host.ends_with("/") {
+            host
+        } else if host.ends_with("/sync") {
+            format!("{host}/")
+        } else {
+            format!("{host}/sync/")
+        },
+    );
 
     let mut collection = anki::collection::CollectionBuilder::new(coll_path.clone())
         .build()
