@@ -7,42 +7,22 @@ async fn main() {
     let username = std::env::var("ANKI_USERNAME").expect("ANKI_USERNAME not set");
     let password = std::env::var("ANKI_PASSWORD").expect("ANKI_PASSWORD not set");
 
-    std::env::set_var(
-        "SYNC_ENDPOINT",
-        if host.ends_with("/") {
-            host
-        } else if host.ends_with("/sync") {
-            format!("{host}/")
-        } else {
-            format!("{host}/sync/")
-        },
-    );
-
     let mut collection = anki::collection::CollectionBuilder::new(coll_path.clone())
+        .set_no_prepopulate(true) // Don't create default decks and notetypes or the sanity check will fail.
         .build()
         .expect("failed to build collection");
 
-    let sync_auth = anki::sync::sync_login(&username, &password)
+    let sync_auth = anki::sync::login::sync_login(username, password, Some(host), Default::default())
         .await
         .expect("login failed");
 
-    if let anki::sync::SyncOutput {
-        required: anki::sync::SyncActionRequired::FullSyncRequired { .. },
-        ..
-    } = collection
-        .normal_sync(sync_auth.clone(), Box::new(|_, _| {}))
+    collection
+        .normal_sync(sync_auth, Default::default())
         .await
-        .expect("normal sync failed")
-    {
-        collection
-            .full_download(sync_auth, Box::new(|_, _| {}))
-            .await
-            .expect("full download failed");
-    } else {
-        drop(collection);
-    }
+        .expect("failed to sync");
 
-    // Open the collection again to upgrade schema.
+    // Re-open the collection again to upgrade schema.
+    drop(collection);
     anki::collection::CollectionBuilder::new(coll_path)
         .build()
         .expect("failed to re-build collection");
