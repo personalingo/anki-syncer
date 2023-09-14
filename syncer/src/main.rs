@@ -50,7 +50,7 @@ async fn main() {
             drop(collection);
             false
         }
-        Err(anki::error::AnkiError::SyncError {
+        Err(e @ anki::error::AnkiError::SyncError {
             source:
                 anki::error::SyncError {
                     kind:
@@ -60,6 +60,7 @@ async fn main() {
                     ..
                 },
         }) => {
+            tracing::error!("failed to normal sync due to error: {e}");
             let local = collection
                 .sync_meta()
                 .expect("failed to get local sync meta");
