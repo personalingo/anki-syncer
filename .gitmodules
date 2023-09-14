@@ -1,4 +1,4 @@
 [submodule "anki"]
 	path = anki
-	url = https://github.com/personalingo/anki
-	branch = personalingo
+	url = https://github.com/ankitects/anki
+	branch = master
