@@ -34,7 +34,7 @@ async fn main() {
 
     let sync_auth = authenticate(host).await;
 
-    match collection
+    let full_sync_required = match collection
         .normal_sync(sync_auth.clone(), Default::default())
         .await
     {
@@ -42,8 +42,14 @@ async fn main() {
             required: anki::sync::collection::normal::SyncActionRequired::FullSyncRequired { .. },
             new_endpoint,
             ..
-        }) => download(collection, reauthenticate(sync_auth, new_endpoint).await).await,
-        Ok(_) => drop(collection),
+        }) => {
+            download(collection, reauthenticate(sync_auth, new_endpoint).await).await;
+            true
+        }
+        Ok(_) => {
+            drop(collection);
+            false
+        }
         Err(anki::error::AnkiError::SyncError {
             source:
                 anki::error::SyncError {
@@ -68,14 +74,17 @@ async fn main() {
                 reauthenticate(sync_auth, status.new_endpoint).await,
             )
             .await;
+            true
         }
         Err(e) => panic!("failed to normal sync: {:?}", e),
-    }
+    };
 
     // Re-open the collection again to upgrade schema.
     anki::collection::CollectionBuilder::new(coll_path)
         .build()
         .expect("failed to re-build collection");
+
+    std::process::exit(if full_sync_required { 2 } else { 0 });
 }
 
 async fn download(collection: anki::collection::Collection, auth: anki::sync::login::SyncAuth) {
