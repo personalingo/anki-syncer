@@ -20,6 +20,7 @@ async fn main() {
             .expect("login failed")
         }
     };
+
     let reauthenticate = |prior: anki::sync::login::SyncAuth, new_endpoint: Option<String>| async {
         if let Some(new_endpoint) = new_endpoint {
             authenticate(new_endpoint).await
@@ -28,8 +29,8 @@ async fn main() {
         }
     };
 
-    let full_sync_required = {
-        let mut collection = anki::collection::CollectionBuilder::new(coll_path.clone())
+    let (full_sync_required, sync_auth) = {
+        let mut collection = anki::collection::CollectionBuilder::new(&coll_path)
             .build()
             .expect("failed to build collection");
 
@@ -45,8 +46,8 @@ async fn main() {
                 new_endpoint,
                 ..
             }) => {
-                download(collection, reauthenticate(sync_auth, new_endpoint).await).await;
-                true
+                download(collection, reauthenticate(sync_auth.clone(), new_endpoint).await).await;
+                (true, sync_auth)
             }
             Ok(anki::sync::collection::normal::SyncOutput {
                 required: anki::sync::collection::normal::SyncActionRequired::NoChanges,
@@ -56,17 +57,18 @@ async fn main() {
                 let local = collection
                     .sync_meta()
                     .expect("failed to get local sync meta");
-                if local.usn == 0i32.into() || local.modified == 0i64.into() {
+                let downloaded = if local.usn == 0i32.into() || local.modified == 0i64.into() {
                     tracing::warn!(
                         "anki server reported no changes required, but the collection appears empty. downloading from {}", new_endpoint.as_deref().unwrap_or("original endpoint")
                     );
-                    download(collection, reauthenticate(sync_auth, new_endpoint).await).await;
+                    download(collection, reauthenticate(sync_auth.clone(), new_endpoint).await).await;
                     true
                 } else {
                     false
-                }
+                };
+                (downloaded, sync_auth)
             }
-            Ok(_) => false,
+            Ok(_) => (false, sync_auth),
             Err(
                 e @ anki::error::AnkiError::SyncError {
                     source:
@@ -93,23 +95,29 @@ async fn main() {
                 )
                 .await
                 .expect("failed to online status check");
-                download(
-                    collection,
-                    reauthenticate(sync_auth, status.new_endpoint).await,
-                )
-                .await;
-                true
+                let sync_auth = reauthenticate(sync_auth, status.new_endpoint).await;
+                download(collection, sync_auth.clone()).await;
+                (true, sync_auth)
             }
             Err(e) => panic!("failed to normal sync: {:?}", e),
         }
     };
 
     // Re-open the collection again to upgrade schema.
-    anki::collection::CollectionBuilder::new(coll_path)
-        .build()
-        .expect("failed to re-build collection");
+    for _ in 0..3 {
+        let mut collection = anki::collection::CollectionBuilder::new(&coll_path)
+            .build()
+            .expect("failed to re-build collection");
+        match anki::services::CollectionService::check_database(&mut collection) {
+            Ok(_) => break,
+            Err(e) => {
+                tracing::error!("collection database check failed {e}");
+                download(collection, sync_auth.clone()).await;
+            }
+        }
+    }
 
-    std::process::exit(if full_sync_required { 42 } else { 0 });
+    std::process::exit(if full_sync_required { 255 } else { 0 });
 }
 
 async fn download(collection: anki::collection::Collection, auth: anki::sync::login::SyncAuth) {
